@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <title>Spotify Card Generator</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f0f0f5;
+            text-align: center;
+            padding: 50px;
+        }
+        .form-group {
+            margin: 20px 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        input[type="text"], input[type="color"], input[type="number"] {
+            padding: 10px;
+            font-size: 16px;
+            margin-right: 10px;
+        }
+        .color-picker-group {
+            display: flex;
+            align-items: center;
+            margin: 10px 0;
+            justify-content: center;
+        }
+        .color-display {
+            width: 30px;
+            height: 30px;
+            border: 1px solid #ccc;
+            margin-left: 10px;
+            cursor: pointer;
+        }
+        .color-display-button {
+            width: 30px;
+            height: 30px;
+            border: 1px solid #ccc;
+            background-color: #ff0000;
+            color: white;
+            font-size: 20px;
+            text-align: center;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            margin-left: 10px;
+            padding: 0;
+            line-height: 1;
+        }
+        button {
+            padding: 10px 20px;
+            background-color: #4caf50;
+            color: white;
+            font-size: 16px;
+            border: none;
+            cursor: pointer;
+            margin: 0 10px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        .color-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .card-size-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-top: 20px;
+        }
+        .card-size-container input {
+            width: 80px;
+            margin: 0 5px;
+        }
+
+        .generate-cards-button {
+            padding: 10px 20px;
+            font-size: 16px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        #generate-cards-button:hover {
+            background-color: #45a049;
+        }
+    </style>
+</head>
+<body>
+
+<h1>Spotify Card Generator</h1>
+
+<div>
+    <div class="form-group">
+        <label for="playlistId">Enter Spotify Playlist ID or URL:</label><br>
+        <input type="text" id="playlistId" name="playlistId" required>
+    </div>
+
+    <div class="color-container" id="color-container">
+        <label for="color1">Colors:</label><br>
+        <!-- Default color pickers will be inserted here -->
+        <div class="color-picker-group" id="color-group-1">
+            <input type="color" id="color1" name="color1" value="#e594c3" style="display:none" onchange="updateColorDisplay('color1', 'color1-display')">
+            <div id="color1-display" class="color-display" style="background-color: #e594c3;" onclick="openColorPicker('color1')"></div>
+            <button type="button" class="color-display-button" onclick="removeColor(1)">×</button>
+        </div>
+        
+        <!-- Similar color pickers for other colors (color2, color3, etc.) -->
+        <div class="color-picker-group" id="color-group-2">
+            <input type="color" id="color2" name="color2" value="#8c52ff" style="display:none" onchange="updateColorDisplay('color2', 'color2-display')">
+            <div id="color2-display" class="color-display" style="background-color: #8c52ff;" onclick="openColorPicker('color2')"></div>
+            <button type="button" class="color-display-button" onclick="removeColor(2)">×</button>
+        </div>
+        <div class="color-picker-group" id="color-group-3">
+            <!-- Color Picker for color3 -->
+            <input type="color" id="color3" name="color3" value="#38b6ff" style="display:none" onchange="updateColorDisplay('color3', 'color3-display')">
+            <div id="color3-display" class="color-display" style="background-color: #38b6ff;" onclick="openColorPicker('color3')"></div>
+            <button type="button" class="color-display-button" onclick="removeColor(3)">×</button>
+        </div>
+        
+        <div class="color-picker-group" id="color-group-4">
+            <!-- Color Picker for color4 -->
+            <input type="color" id="color4" name="color4" value="#79c97a" style="display:none" onchange="updateColorDisplay('color4', 'color4-display')">
+            <div id="color4-display" class="color-display" style="background-color: #79c97a;" onclick="openColorPicker('color4')"></div>
+            <button type="button" class="color-display-button" onclick="removeColor(4)">×</button>
+        </div>
+        
+        <div class="color-picker-group" id="color-group-5">
+            <!-- Color Picker for color5 -->
+            <input type="color" id="color5" name="color5" value="#ffde59" style="display:none" onchange="updateColorDisplay('color5', 'color5-display')">
+            <div id="color5-display" class="color-display" style="background-color: #ffde59;" onclick="openColorPicker('color5')"></div>
+            <button type="button" class="color-display-button" onclick="removeColor(5)">×</button>
+        <!-- Additional color pickers as necessary -->
+        </div>
+    </div>
+
+    <button type="button" onclick="addColor()">Add Color</button>
+
+    <div class="card-size-container">
+        <label for="cardWidth">Card Size:</label>
+        <input type="number" id="cardWidth" name="cardWidth" value="512" min="1" required>
+        x
+        <input type="number" id="cardHeight" name="cardHeight" value="512" min="1" required>
+    </div>
+
+    <div class="generateCard" style="padding: 20px;">
+        <button id="generate-cards-button" onclick="generateCards()">Generate Cards</button>
+    </div>
+
+    <div class="card-container" id="card-container"></div>
+</div>
+
+<script>
+    let colorCount = 5;
+
+    function openColorPicker(colorInputId) {
+        const picker = document.getElementById(colorInputId);
+        picker.click();
+    }
+
+    function updateColorDisplay(colorInputId, displayId) {
+        const colorValue = document.getElementById(colorInputId).value;
+        document.getElementById(displayId).style.backgroundColor = colorValue;
+    }
+
+    function addColor() {
+        colorCount++;
+        const newColorGroup = document.createElement("div");
+        newColorGroup.classList.add("color-picker-group");
+        newColorGroup.id = `color-group-${colorCount}`;
+        newColorGroup.innerHTML = `
+            <input type="color" id="color${colorCount}" name="color${colorCount}" value="#000000" style="display:none" onchange="updateColorDisplay('color${colorCount}', 'color${colorCount}-display')">
+            <div id="color${colorCount}-display" class="color-display" style="background-color: #000000;" onclick="openColorPicker('color${colorCount}')"></div>
+            <button type="button" class="color-display-button" onclick="removeColor(${colorCount})">×</button>
+        `;
+        document.getElementById("color-container").appendChild(newColorGroup);
+    }
+
+    function removeColor(index) {
+        const colorGroup = document.getElementById(`color-group-${index}`);
+        colorGroup.remove();
+    }
+
+    // Spotify API Credentials and Redirect URI
+    const CLIENT_ID = "f12de1d8bf894f979178a945fa02f0d0";  // Replace with your client ID
+    const REDIRECT_URI = "http://localhost:8888/callback";  // Replace with your redirect URI
+    const SCOPES = "playlist-read-private";
+
+    // Spotify API token management (Implicit Flow)
+    let accessToken = null;
+
+    // Check for the access token in URL fragment (Implicit Flow)
+    async function getAccessToken() {
+        const CLIENT_ID = "f12de1d8bf894f979178a945fa02f0d0"
+        const CLIENT_SECRET = "9f21973a9f5b4977afda7b11bfc9ce66"
+        const tokenUrl = 'https://accounts.spotify.com/api/token';
+
+        const response = await fetch(tokenUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'Authorization': 'Basic ' + btoa(CLIENT_ID + ':' + CLIENT_SECRET)
+            },
+            body: new URLSearchParams({
+                grant_type: 'client_credentials'
+            })
+        });
+
+        const data = await response.json();
+        if (data.access_token) {
+            return data.access_token;  // Return the access token
+        } else {
+            console.error('Failed to get access token:', data);
+            return null;
+        }
+    }
+
+
+    async function fetchPlaylistTracks(playlistId) {
+    const accessToken = await getAccessToken();
+    if (!accessToken) {
+        alert('Access token is missing.');
+        return;
+    }
+
+    const apiUrl = `https://api.spotify.com/v1/playlists/${playlistId}/tracks`;
+    const response = await fetch(apiUrl, {
+        method: 'GET',
+        headers: {
+            'Authorization': `Bearer ${accessToken}`
+        }
+    });
+
+    const data = await response.json();
+    console.log(data); // Check the data structure here
+
+    if (data.error) {
+        alert('Error fetching playlist tracks.');
+        return;
+    }
+
+    // Function to generate the Spotify Code URL
+    function generateSpotifyCodeUrl(trackId) {
+        return `https://scannables.scdn.co/uri/plain/png/000000/white/640/spotify:track:${trackId}`;
+    }
+
+    // Process the tracks and return the desired details
+    const trackDetails = data.items.map(item => {
+        const track = item.track; // Get the track from each playlist item
+
+        // Extracting the relevant information
+        const artistName = track.artists[0].name; // Assuming there is at least one artist
+        const songName = track.name;
+        const releaseYear = new Date(track.album.release_date).getFullYear(); // Extract the year from release date
+        const spotifyCode = generateSpotifyCodeUrl(track.id);
+
+        // Return the processed details in an object
+        return {
+            artist: artistName,
+            song: songName,
+            year: releaseYear,
+            spotifyCode: spotifyCode
+        };
+    });
+
+    return trackDetails; // Return the array of track details
+}
+
+
+    // Function to collect all color values from the color pickers
+    function getColors() {
+        const colors = [];
+        // Select all color input elements within the color-container
+        const colorInputs = document.querySelectorAll('.color-picker-group input[type="color"]');
+        
+        // Push each color value into the colors array
+        colorInputs.forEach(input => {
+            colors.push(input.value);
+        });
+        
+        return colors;
+    }
+
+    function parseSpotifyPlaylistId(url) {
+        const regex = /(?:spotify\.com\/(?:playlist|track|album|artist)\/)([a-zA-Z0-9]{22})(?:[?&].*)?$/;
+        const match = url.match(regex);
+        
+        if (match && match[1]) {
+            return match[1]; // Return the playlist ID if matched
+        }
+        
+        // If no match, return null or an empty string (whichever is preferred)
+        return null;  // Or return '' if you prefer an empty string
+    }
+
+
+    function balanceColors(trackCount, colorsList) {
+        const assignments = [];
+        const colorCount = colorsList.length;
+        
+        // Ensure balanced assignment of colors
+        for (let i = 0; i < trackCount; i++) {
+            assignments.push(colorsList[i % colorCount]);  // Cycle through the colors evenly
+        }
+        
+        return assignments;
+    }
+
+    function injectScript(uri) {
+        const document = window.document;
+        const script = document.createElement("script");
+        script.setAttribute("src", uri);
+        document.body.appendChild(script);
+    }
+
+    function injectHtml2canvas() {
+        injectScript("//html2canvas.hertzen.com/dist/html2canvas.js");
+    }
+
+    // Function to generate cards for each track
+    async function generateCards() {
+        const playlistId = document.getElementById("playlistId").value;
+        if (!playlistId) {
+            alert("Please enter a valid playlist ID.");
+            return;
+        }
+        getAccessToken(); // Get access token from URL
+
+        const tracks = await fetchPlaylistTracks(parseSpotifyPlaylistId(playlistId));
+        const trackCount = tracks.length;
+        const colorAssignments = balanceColors(trackCount, getColors());
+
+        //injectHtml2canvas();
+        generateCardsBuild(tracks, colorAssignments);
+    }
+
+    // Function to generate Spotify QR Code URL (for back face)
+    function generateSpotifyCodeUrl(trackId) {
+        return `https://scannables.scdn.co/uri/plain/png/000000/white/640/spotify:track:${trackId}`;
+    }
+
+    // Function to generate the cards and create zip
+    async function generateCardsBuild(tracks, colors) {
+        const zip = new JSZip();
+        const cardContainer = document.getElementById("card-container");
+        cardContainer.innerHTML = ''; // Clear previous cards
+
+        const width = document.getElementById("cardWidth").value;
+        const height = document.getElementById("cardHeight").value;
+
+        const promises = tracks.map(async (track, index) => {
+            const backgroundColor = colors[index];
+
+            // Create the back face element (with QR code for Spotify)
+            const backCardElement = document.createElement('div');
+            backCardElement.style.width = `${width}px`;
+            backCardElement.style.height = `${height}px`;
+            backCardElement.style.backgroundColor = 'white';
+            backCardElement.style.display = 'flex';
+            backCardElement.style.justifyContent = 'center';
+            backCardElement.style.alignItems = 'center';
+            backCardElement.style.textAlign = 'center';
+            backCardElement.style.border = '1px solid #000';
+            backCardElement.innerHTML = `
+                <img src="${track.spotifyCode}" style="max-width: ${width * 0.8}px; max-height: ${height * 0.8}px;" />
+            `;
+
+            // Create the front face element
+            const frontCardElement = document.createElement('div');
+            frontCardElement.style.width = `${width}px`;
+            frontCardElement.style.height = `${height}px`;
+            frontCardElement.style.backgroundColor = backgroundColor;
+            frontCardElement.style.display = 'flex';
+            frontCardElement.style.flexDirection = 'column'; // Stack the text elements vertically
+            frontCardElement.style.justifyContent = 'center';
+            frontCardElement.style.alignItems = 'center';
+            frontCardElement.style.textAlign = 'center';
+            frontCardElement.style.border = '1px solid #000';
+
+            frontCardElement.innerHTML = `
+                <div>
+                    <h2 style="font-size: 52px; font-weight: normal; margin-bottom: 17px;">${track.artist}</h2> <!-- Artist name (smaller) -->
+                    <h1 style="font-size: 150px; font-weight: bold;  margin: 0;">${track.year}</h1> <!-- Year (largest) -->
+                    <h2 style="font-size: 52px; font-weight: normal; font-style: italic; margin-top: 17px;">${track.song}</h2> <!-- Song name (larger) -->
+                </div>
+            `
+
+            cardContainer.appendChild(frontCardElement);
+            cardContainer.appendChild(backCardElement);
+
+            frontPromise = html2canvas(frontCardElement, { useCORS: true }).then(function(canvas) {
+                    const frontDataURL = canvas.toDataURL('image/png');
+                    zip.file(`card_${index + 1}_front.png`, frontDataURL.split(',')[1], { base64: true });
+                });
+
+            // Capture the back card image
+            backPromise = html2canvas(backCardElement, { useCORS: true }).then(function(canvas) {
+                const backDataURL = canvas.toDataURL('image/png');
+                zip.file(`card_${index + 1}_back.png`, backDataURL.split(',')[1], { base64: true });
+            });
+
+            // Return a Promise that resolves when both front and back card images are processed
+            return Promise.all([frontPromise, backPromise]).then(() => {
+            console.log('Both images processed');
+            cardContainer.removeChild(frontCardElement);
+            cardContainer.removeChild(backCardElement);
+            });
+        });
+
+
+        // Wait for all cards to be processed
+        await Promise.all(promises);
+
+        // Generate the zip file and trigger download
+        zip.generateAsync({ type: "blob" }).then(function(content) {
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(content);
+            link.download = "spotify_cards.zip";
+            link.click();
+        });
+    }
+</script>
+
+</body>
+</html>
