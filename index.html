@@ -7,9 +7,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.4.0/jspdf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jspdf@2.4.0/dist/jspdf.umd.min.js"></script>
-    <script>
-        console.log(window.jspdf); // Should log an object if loaded successfully
-    </script>
     <title>Spotify Card Generator</title>
     <style>
         body {
@@ -167,7 +164,6 @@
 </div>
 
 <script>
-    console.log(window.jspdf); // Should log an object if jsPDF is loaded
     const { jsPDF } = window.jspdf;
 
     let colorCount = 5;
@@ -251,7 +247,6 @@
     });
 
     const data = await response.json();
-    console.log(data); // Check the data structure here
 
     if (data.error) {
         alert('Error fetching playlist tracks.');
@@ -325,17 +320,6 @@
         return assignments;
     }
 
-    function injectScript(uri) {
-        const document = window.document;
-        const script = document.createElement("script");
-        script.setAttribute("src", uri);
-        document.body.appendChild(script);
-    }
-
-    function injectHtml2canvas() {
-        injectScript("//html2canvas.hertzen.com/dist/html2canvas.js");
-    }
-
     // Function to generate Spotify QR Code URL (for back face)
     function generateSpotifyCodeUrl(trackId) {
         return `https://scannables.scdn.co/uri/plain/png/000000/white/640/spotify:track:${trackId}`;
@@ -360,7 +344,19 @@
             pdf.setTextColor('#000');
             pdf.setFontSize(72);
             pdf.setFont('helvetica', 'normal');
-            pdf.text(String(track.artist), width / 2, height / 3 - 35, { align: 'center' }); // Artist
+            
+            let currentY = height / 3 - 35;
+            let text = String(track.artist);
+            let wrappedText = pdf.splitTextToSize(text, width - 50);
+
+            if (wrappedText.length > 1) {
+                currentY -= 50;
+            }
+            wrappedText.forEach((line, index) => {
+                pdf.text(line, width / 2, currentY, { align: 'center' });
+                currentY += 70;
+            });
+
 
             pdf.setFontSize(175);
             pdf.setFont('helvetica', 'bold');
@@ -368,7 +364,14 @@
 
             pdf.setFontSize(72);
             pdf.setFont('helvetica', 'italic');
-            pdf.text(String(track.song), width / 2, (height / 3) * 2 + 35, { align: 'center' }); // Song
+            //pdf.text(String(track.song), width / 2, (height / 3) * 2 + 35, { align: 'center' }); // Song
+            currentY = (height / 3) * 2 + 35;
+            text = String(track.song);
+            wrappedText = pdf.splitTextToSize(text, width - 50);
+            wrappedText.forEach((line, index) => {
+                pdf.text(line, width / 2, currentY, { align: 'center' });
+                currentY += 70;
+            });
 
             pdf.addPage();
 
@@ -420,48 +423,6 @@
         // Save the final PDF
         pdf.save('cards.pdf');
     };
-
-    function generatePDF_old(tracks, colors, width, height) {
-        const pdf = new jsPDF();
-        let currentPage = 1;
-
-        tracks.forEach((track, index) => {
-            const backgroundColor = colors[index];
-
-            // Front of the card
-            pdf.setFillColor(backgroundColor);
-            pdf.rect(0, 0, width, height, 'F'); // Draw the background color
-
-            pdf.setFontSize(16);
-            pdf.text(String(track.artist), 10, 20); // Artist
-            pdf.setFontSize(40);
-            pdf.text(String(track.year), width / 2, 50, { align: 'center' }); // Year (centered horizontally)
-            pdf.setFontSize(16);
-            pdf.text(String(track.song), width / 2, 80, { align: 'center' }); // Song (centered horizontally)
-
-            // Back of the card (QR code)
-            pdf.addPage(); // Add a new page for the back
-            pdf.setFillColor(255, 255, 255); // White background
-            pdf.rect(0, 0, width, height, 'F'); // Draw the white rectangle
-
-            if (track.spotifyCode) {
-                // Dynamically calculate the size to maintain proportions and center the image
-                const qrCodeWidth = 100; // Desired width of the QR code
-                const qrCodeHeight = 100; // Desired height of the QR code
-                const qrCodeX = (width - qrCodeWidth) / 2; // Center horizontally
-                const qrCodeY = (height - qrCodeHeight) / 2; // Center vertically
-
-                pdf.addImage(track.spotifyCode, 'PNG', qrCodeX, qrCodeY, qrCodeWidth, qrCodeHeight);
-            }
-
-            if (index < tracks.length - 1) {
-                pdf.addPage(); // Add a new page for the next track
-                currentPage++;
-            }
-        });
-
-        pdf.save('cards.pdf'); // Save the PDF
-    }
 
     // Function to generate the cards and create zip
     async function generateCardsBuild(tracks, colors) {
@@ -560,7 +521,6 @@
         const width = document.getElementById("cardWidth").value;
         const height = document.getElementById("cardHeight").value;
 
-        //injectHtml2canvas();
         //generateCardsBuild(tracks, colorAssignments);
         generatePDF(tracks, colorAssignments, width, height);
     }
