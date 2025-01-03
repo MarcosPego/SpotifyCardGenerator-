@@ -5,6 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.4.0/jspdf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jspdf@2.4.0/dist/jspdf.umd.min.js"></script>
+    <script>
+        console.log(window.jspdf); // Should log an object if loaded successfully
+    </script>
     <title>Spotify Card Generator</title>
     <style>
         body {
@@ -162,6 +167,9 @@
 </div>
 
 <script>
+    console.log(window.jspdf); // Should log an object if jsPDF is loaded
+    const { jsPDF } = window.jspdf;
+
     let colorCount = 5;
 
     function openColorPicker(colorInputId) {
@@ -328,26 +336,131 @@
         injectScript("//html2canvas.hertzen.com/dist/html2canvas.js");
     }
 
-    // Function to generate cards for each track
-    async function generateCards() {
-        const playlistId = document.getElementById("playlistId").value;
-        if (!playlistId) {
-            alert("Please enter a valid playlist ID.");
-            return;
-        }
-        getAccessToken(); // Get access token from URL
-
-        const tracks = await fetchPlaylistTracks(parseSpotifyPlaylistId(playlistId));
-        const trackCount = tracks.length;
-        const colorAssignments = balanceColors(trackCount, getColors());
-
-        //injectHtml2canvas();
-        generateCardsBuild(tracks, colorAssignments);
-    }
-
     // Function to generate Spotify QR Code URL (for back face)
     function generateSpotifyCodeUrl(trackId) {
         return `https://scannables.scdn.co/uri/plain/png/000000/white/640/spotify:track:${trackId}`;
+    }
+
+    const generatePDF = async (tracks, colors, width, height) => {
+        const pdf = new jsPDF({
+            orientation: 'portrait',
+            unit: 'px',
+            format: [width, height],
+        });
+
+        for (let index = 0; index < tracks.length; index++) {
+            const track = tracks[index];
+            const backgroundColor = colors[index];
+
+            // Create the front card
+            pdf.setFillColor(backgroundColor);
+            pdf.rect(0, 0, width, height, 'F'); // Draw the background
+
+            // Add front card text
+            pdf.setTextColor('#000');
+            pdf.setFontSize(72);
+            pdf.setFont('helvetica', 'normal');
+            pdf.text(String(track.artist), width / 2, height / 3 - 35, { align: 'center' }); // Artist
+
+            pdf.setFontSize(175);
+            pdf.setFont('helvetica', 'bold');
+            pdf.text(String(track.year), width / 2, height / 2 + 30, { align: 'center' }); // Year
+
+            pdf.setFontSize(72);
+            pdf.setFont('helvetica', 'italic');
+            pdf.text(String(track.song), width / 2, (height / 3) * 2 + 35, { align: 'center' }); // Song
+
+            pdf.addPage();
+
+            // Create the back card (QR code for Spotify)
+            pdf.setFillColor('#FFFFFF'); // White background
+            pdf.rect(0, 0, width, height, 'F');
+
+            const qrImage = track.spotifyCode;
+
+            // Add QR Code
+            await new Promise((resolve) => {
+                const img = new Image();
+                img.crossOrigin = 'Anonymous'; // Enable cross-origin
+                img.onload = () => {
+                    let imgWidth = img.naturalWidth;
+                    let imgHeight = img.naturalHeight;
+
+                    // Scale down the image if it exceeds the maximum dimensions
+                    const maxImgWidth = width * 0.8;
+                    const maxImgHeight = height * 0.8;
+
+                    if (imgWidth > maxImgWidth || imgHeight > maxImgHeight) {
+                        const widthRatio = maxImgWidth / imgWidth;
+                        const heightRatio = maxImgHeight / imgHeight;
+                        const scale = Math.min(widthRatio, heightRatio); // Use the smaller ratio to maintain aspect ratio
+                        imgWidth *= scale;
+                        imgHeight *= scale;
+                    }
+
+                    pdf.addImage(
+                        img,
+                        'PNG',
+                        (width - imgWidth) / 2,
+                        (height - imgHeight) / 2,
+                        imgWidth,
+                        imgHeight
+                    );
+                    resolve();
+                };
+                img.src = qrImage;
+            });
+
+            // Add another page for the next card if it's not the last one
+            if (index < tracks.length - 1) {
+                pdf.addPage();
+            }
+        }
+
+        // Save the final PDF
+        pdf.save('cards.pdf');
+    };
+
+    function generatePDF_old(tracks, colors, width, height) {
+        const pdf = new jsPDF();
+        let currentPage = 1;
+
+        tracks.forEach((track, index) => {
+            const backgroundColor = colors[index];
+
+            // Front of the card
+            pdf.setFillColor(backgroundColor);
+            pdf.rect(0, 0, width, height, 'F'); // Draw the background color
+
+            pdf.setFontSize(16);
+            pdf.text(String(track.artist), 10, 20); // Artist
+            pdf.setFontSize(40);
+            pdf.text(String(track.year), width / 2, 50, { align: 'center' }); // Year (centered horizontally)
+            pdf.setFontSize(16);
+            pdf.text(String(track.song), width / 2, 80, { align: 'center' }); // Song (centered horizontally)
+
+            // Back of the card (QR code)
+            pdf.addPage(); // Add a new page for the back
+            pdf.setFillColor(255, 255, 255); // White background
+            pdf.rect(0, 0, width, height, 'F'); // Draw the white rectangle
+
+            if (track.spotifyCode) {
+                // Dynamically calculate the size to maintain proportions and center the image
+                const qrCodeWidth = 100; // Desired width of the QR code
+                const qrCodeHeight = 100; // Desired height of the QR code
+                const qrCodeX = (width - qrCodeWidth) / 2; // Center horizontally
+                const qrCodeY = (height - qrCodeHeight) / 2; // Center vertically
+
+                pdf.addImage(track.spotifyCode, 'PNG', qrCodeX, qrCodeY, qrCodeWidth, qrCodeHeight);
+            }
+
+            if (index < tracks.length - 1) {
+                pdf.addPage(); // Add a new page for the next track
+                currentPage++;
+            }
+        });
+
+        pdf.save('cards.pdf'); // Save the PDF
     }
 
     // Function to generate the cards and create zip
@@ -429,6 +542,27 @@
             link.download = "spotify_cards.zip";
             link.click();
         });
+    }
+
+    // Function to generate cards for each track
+    async function generateCards() {
+        const playlistId = document.getElementById("playlistId").value;
+        if (!playlistId) {
+            alert("Please enter a valid playlist ID.");
+            return;
+        }
+        getAccessToken(); // Get access token from URL
+
+        const tracks = await fetchPlaylistTracks(parseSpotifyPlaylistId(playlistId));
+        const trackCount = tracks.length;
+        const colorAssignments = balanceColors(trackCount, getColors());
+        
+        const width = document.getElementById("cardWidth").value;
+        const height = document.getElementById("cardHeight").value;
+
+        //injectHtml2canvas();
+        //generateCardsBuild(tracks, colorAssignments);
+        generatePDF(tracks, colorAssignments, width, height);
     }
 </script>
 
