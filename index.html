@@ -230,55 +230,154 @@
         }
     }
 
+    async function fetchArtistMbid(artistName) {
+        const url = `https://musicbrainz.org/ws/2/artist/?query=artist:${encodeURIComponent(artistName)}&fmt=json`;
+        const response = await fetch(url);
+        const data = await response.json();
+        if (data.artists && data.artists.length > 0) {
+            console.log(data.artists);
+            return data.artists[0].id; // Return the MBID of the first matching artist
+        } else {
+            throw new Error("Artist not found");
+        }
+    }
+
+    // Function to fetch the correct year from MusicBrainz
+    async function fetchYearFromMusicBrainz(artistName, trackName) {
+        const baseUrl = 'https://musicbrainz.org/ws/2/recording/';
+        const query = `?query=artist:${encodeURIComponent(artistName)} AND recording:${encodeURIComponent(trackName)}&fmt=json`;
+
+        try {
+            const response = await fetch(baseUrl + query, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error('Error fetching from MusicBrainz');
+            }
+
+            const data = await response.json();
+
+            
+            console.log(data);
+            if (data.recordings && data.recordings.length > 0) {
+                let earliestYear = null;
+
+                // Iterate over recordings to find the matching artist and track
+                data.recordings.forEach(recording => {
+                    // Check if the artist and track name match
+                    const isArtistMatch = recording["artist-credit"] && recording["artist-credit"].some(artist => artist.name.toLowerCase() === artistName.toLowerCase());
+                    const isTrackMatch = recording.title.toLowerCase() === trackName.toLowerCase();
+
+                    if (isArtistMatch && isTrackMatch) {
+                        console.log(recording);
+
+                        const releaseDate = recording["first-release-date"];
+                        if (releaseDate) {
+                            const year = releaseDate.split("-")[0];
+                            if (!earliestYear || year < earliestYear) {
+                                earliestYear = year;
+                            }
+                        }
+                    }
+                });
+
+                return earliestYear || "No release date found";
+            } else {
+                return "No recordings found";
+            }
+        } catch (error) {
+            console.error('Error fetching year from MusicBrainz:', error);
+            return null;
+        }
+    }
+
+    async function fetchYearFromLastFM(artist, track) {
+        const apiKey = "21ba4f8d0835cc1eb2244025054b8050"; // Replace with your API key
+        const baseUrl = "https://ws.audioscrobbler.com/2.0/";
+        const query = `?method=track.getInfo&api_key=${apiKey}&artist=${encodeURIComponent(artist)}&track=${encodeURIComponent(track)}&format=json`;
+
+        try {
+            const response = await fetch(baseUrl + query);
+
+            if (!response.ok) {
+                throw new Error(`Last.fm API error: ${response.statusText}`);
+            }
+
+            const data = await response.json();
+
+            console.log(data);
+
+            // Check if data exists and extract release year
+            if (data && data.track && data.track.album) {
+                const releaseYear = data.track.album["@attr"]?.releaseYear;
+
+                if (releaseYear) {
+                    console.log(releaseYear);
+                    return releaseYear;
+                }
+            }
+
+            return "Unknown"; // Return fallback if no year is found
+        } catch (error) {
+            console.error("Error fetching data from Last.fm:", error);
+            return "Unknown";
+        }
+    }
 
     async function fetchPlaylistTracks(playlistId) {
-    const accessToken = await getAccessToken();
-    if (!accessToken) {
-        alert('Access token is missing.');
-        return;
-    }
-
-    const apiUrl = `https://api.spotify.com/v1/playlists/${playlistId}/tracks`;
-    const response = await fetch(apiUrl, {
-        method: 'GET',
-        headers: {
-            'Authorization': `Bearer ${accessToken}`
+        const accessToken = await getAccessToken();
+        if (!accessToken) {
+            alert('Access token is missing.');
+            return;
         }
-    });
 
-    const data = await response.json();
+        const apiUrl = `https://api.spotify.com/v1/playlists/${playlistId}/tracks`;
+        const response = await fetch(apiUrl, {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${accessToken}`
+            }
+        });
 
-    if (data.error) {
-        alert('Error fetching playlist tracks.');
-        return;
+        const data = await response.json();
+
+        if (data.error) {
+            alert('Error fetching playlist tracks.');
+            return;
+        }
+
+        // Function to generate the Spotify Code URL
+        function generateSpotifyCodeUrl(trackId) {
+            return `https://scannables.scdn.co/uri/plain/png/000000/white/640/spotify:track:${trackId}`;
+        }
+
+        // Process the tracks and return the desired details
+        const trackDetails = await Promise.all(data.items.map(async (item) => {
+            const track = item.track; // Get the track from each playlist item
+
+            // Extracting the relevant information
+            const artistName = track.artists[0].name; // Assuming there is at least one artist
+            const songName = track.name;
+            const releaseYear = new Date(track.album.release_date).getFullYear(); // Extract the year from release date
+            const spotifyCode = generateSpotifyCodeUrl(track.id);
+
+            const correctYear = await fetchYearFromMusicBrainz(artistName, songName);
+
+            // Return the processed details in an object
+            return {
+                artist: artistName,
+                song: songName,
+                year: correctYear,
+                spotifyCode: spotifyCode
+            };
+        }));
+
+        return trackDetails; // Return the array of track details
     }
-
-    // Function to generate the Spotify Code URL
-    function generateSpotifyCodeUrl(trackId) {
-        return `https://scannables.scdn.co/uri/plain/png/000000/white/640/spotify:track:${trackId}`;
-    }
-
-    // Process the tracks and return the desired details
-    const trackDetails = data.items.map(item => {
-        const track = item.track; // Get the track from each playlist item
-
-        // Extracting the relevant information
-        const artistName = track.artists[0].name; // Assuming there is at least one artist
-        const songName = track.name;
-        const releaseYear = new Date(track.album.release_date).getFullYear(); // Extract the year from release date
-        const spotifyCode = generateSpotifyCodeUrl(track.id);
-
-        // Return the processed details in an object
-        return {
-            artist: artistName,
-            song: songName,
-            year: releaseYear,
-            spotifyCode: spotifyCode
-        };
-    });
-
-    return trackDetails; // Return the array of track details
-}
 
 
     // Function to collect all color values from the color pickers
