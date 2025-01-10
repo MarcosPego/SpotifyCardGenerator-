@@ -7,6 +7,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.4.0/jspdf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jspdf@2.4.0/dist/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/3.1.9/crypto-js.min.js"></script>
     <title>Spotify Card Generator</title>
     <style>
         body {
@@ -157,10 +158,19 @@
     </div>
 
     <div class="generateCard" style="padding: 20px;">
-        <button id="generate-cards-button" onclick="generateCards()">Generate Cards</button>
+        <button id="generate-cards-button" onclick="generateCards(true, false)">Generate Cards: Spotify</button>
     </div>
 
-    <div class="card-container" id="card-container"></div>
+    <div class="generateCard" style="padding: 20px;">
+        <button id="generate-cards-button" onclick="generateCards(false, true)">Generate Cards: No Spotify</button>
+    </div>
+
+    <div class="generateCard" style="padding: 20px;">
+        <button id="generate-cards-button" onclick="generateCards(false, false)">Generate Cards: All</button>
+    </div>
+
+    <div class="progress-container" style="padding: 20px;" id="progress-container"></div>
+    <div class="card-container" style="padding: 20px;" id="card-container"></div>
 </div>
 
 <script>
@@ -242,11 +252,172 @@
         }
     }
 
+    // Delay function that returns a Promise that resolves after a set time
+    function delay(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    const discogsToken = 'RaTrQODdErwfpgXrNoUmPfPbuZwzzYnnPzKrGNFd'; // Replace with your token
+
+    // Function to fetch artist ID based on artist name
+    async function fetchArtistId(artistName) {
+        const searchUrl = `https://api.discogs.com/database/search?q=${encodeURIComponent(artistName)}&type=artist&token=${discogsToken}`;
+
+        try {
+            const response = await fetch(searchUrl);
+            const data = await response.json();
+            const artist = data.results[0]; // Assuming the first result is the correct artist
+            return artist.id;
+        } catch (error) {
+            console.error('Error fetching artist ID:', error);
+            return null;
+        }
+    }
+
+    // Function to search for a specific track from an artist
+    async function fetchTrackReleaseYear(artistName, trackName) {
+        try {
+            // Step 1: Get the artist ID
+            const artistId = await fetchArtistId(artistName);
+            if (!artistId) {
+                console.log('Artist not found: ' + artistName);
+                return " ";
+            }
+
+            // Step 2: Search for the track in the artist's releases
+            const trackSearchUrl = `https://api.discogs.com/artists/${artistId}/releases?token=${discogsToken}`;
+            const response = await fetch(trackSearchUrl);
+            const data = await response.json();
+
+            // Step 3: Look through the releases to find the track
+            const trackRelease = data.releases.find(release => release.title.toLowerCase().includes(trackName.toLowerCase()));
+
+            if (trackRelease) {
+                // Step 4: Return the release year
+                //console.log(`Track: ${trackRelease.title}, Year: ${trackRelease.year}`);
+                if (!trackRelease.year) {
+                    return " ";
+                }
+
+                return trackRelease.year;
+            } else {
+                //console.log(`Artist:  ${artistName} | Track ${trackName} not found in the discography`);
+                return " ";
+            }
+        } catch (error) {
+            console.error('Error fetching track release year:', error);
+            return " ";
+        }
+    }
+
+    async function fetchArtistId(artistName) {
+    const searchUrl = `https://api.discogs.com/database/search?q=${encodeURIComponent(artistName)}&type=artist&token=${discogsToken}`;
+
+    try {
+        const response = await fetch(searchUrl);
+        const data = await response.json();
+        const artist = data.results[0]; // Assuming the first result is the correct artist
+        return artist.id;
+    } catch (error) {
+        console.error('Error fetching artist ID:', error);
+        return null;
+    }
+}
+
+async function addTrackToCollection(userToken, releaseId) {
+    const addTrackUrl = `https://api.discogs.com/users/me/collection/releases`;
+    const body = JSON.stringify({
+        release_id: releaseId
+    });
+
+    const response = await fetch(addTrackUrl, {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${userToken}`,
+            'Content-Type': 'application/json'
+        },
+        body: body
+    });
+
+    if (response.ok) {
+        console.log(`Successfully added release with ID ${releaseId} to the collection!`);
+    } else {
+        console.error('Error adding release to collection:', await response.text());
+    }
+}
+
+async function fetchTrackReleaseId(artistName, trackName) {
+    try {
+        const artistId = await fetchArtistId(artistName);
+        if (!artistId) {
+            console.log('Artist not found');
+            return;
+        }
+
+        // Search for the track
+        const trackSearchUrl = `https://api.discogs.com/artists/${artistId}/releases?token=${discogsToken}`;
+        const response = await fetch(trackSearchUrl);
+        const data = await response.json();
+
+        // Find the release ID for the track
+        const trackRelease = data.releases.find(release => release.title.toLowerCase().includes(trackName.toLowerCase()));
+
+        if (trackRelease) {
+            return trackRelease.id; // Return release ID
+        } else {
+            console.log('Track not found in the discography');
+            return null;
+        }
+    } catch (error) {
+        console.error('Error fetching track release ID:', error);
+    }
+}
+
+    async function fetchDiscography(artistName) {
+        // Replace spaces with underscores for Wikipedia page formatting
+        const pageTitle = artistName.replace(/ /g, '_');
+
+        // Fetch the Wikipedia page content
+        const url = `https://en.wikipedia.org/w/api.php?action=query&prop=revisions&rvprop=content&format=json&titles=${pageTitle}`;
+        
+        try {
+            const response = await fetch(url);
+            const data = await response.json();
+            const page = data.query.pages[Object.keys(data.query.pages)[0]];
+
+            // Extract the content of the page
+            const pageContent = page.revisions[0]['*'];
+
+            // Look for the section with discography (this may need adjustments for different formats)
+            const discographyRegex = /==\s*Discography\s*==[\s\S]*?==/g;
+            const discographySection = pageContent.match(discographyRegex);
+
+            if (discographySection) {
+                // Return the found discography section
+                return discographySection[0];
+            } else {
+                return 'Discography section not found';
+            }
+        } catch (error) {
+            console.error('Error fetching data from Wikipedia:', error);
+            return 'Error fetching data';
+        }
+    }
+
+    const normalizeString = (str) => 
+    str
+        .normalize("NFD") // Normalize to decompose accents
+        .replace(/[\u0300-\u036f]/g, "") // Remove diacritical marks
+        .replace(/[^a-zA-Z0-9\s]/g, "") // Remove special characters
+        .toLowerCase(); // Convert to lowercase
+
     // Function to fetch the correct year from MusicBrainz
     async function fetchYearFromMusicBrainz(artistName, trackName) {
+        const proxyUrl = 'https://api.allorigins.win/raw?url=';
+
         const baseUrl = 'https://musicbrainz.org/ws/2/recording/';
         const query = `?query=artist:${encodeURIComponent(artistName)} AND recording:${encodeURIComponent(trackName)}&fmt=json`;
-
+        
         try {
             const response = await fetch(baseUrl + query, {
                 method: 'GET',
@@ -260,21 +431,22 @@
             }
 
             const data = await response.json();
-
-            
-            console.log(data);
+            //console.log(data);
             if (data.recordings && data.recordings.length > 0) {
                 let earliestYear = null;
 
                 // Iterate over recordings to find the matching artist and track
                 data.recordings.forEach(recording => {
                     // Check if the artist and track name match
-                    const isArtistMatch = recording["artist-credit"] && recording["artist-credit"].some(artist => artist.name.toLowerCase() === artistName.toLowerCase());
-                    const isTrackMatch = recording.title.toLowerCase() === trackName.toLowerCase();
+                    //const isArtistMatch = recording["artist-credit"] && recording["artist-credit"].some(artist => artist.name.toLowerCase() === artistName.toLowerCase());
+                    //const isTrackMatch = recording.title.toLowerCase() === trackName.toLowerCase();
+
+                    const isArtistMatch = recording["artist-credit"] && recording["artist-credit"].some(artist => 
+                        normalizeString(artist.name) === normalizeString(artistName)
+                    );
+                    const isTrackMatch = normalizeString(recording.title) === normalizeString(trackName);
 
                     if (isArtistMatch && isTrackMatch) {
-                        console.log(recording);
-
                         const releaseDate = recording["first-release-date"];
                         if (releaseDate) {
                             const year = releaseDate.split("-")[0];
@@ -284,10 +456,10 @@
                         }
                     }
                 });
-
-                return earliestYear || "No release date found";
+            
+                return earliestYear || " ";
             } else {
-                return "No recordings found";
+                return " ";
             }
         } catch (error) {
             console.error('Error fetching year from MusicBrainz:', error);
@@ -328,7 +500,54 @@
         }
     }
 
-    async function fetchPlaylistTracks(playlistId) {
+    const geniusToken = 'FOnyz-IghQhgyML0rV_odLHJSzAc5fd-0fkqGBZRfPEWYlJaDB4pyUWjr-rNEE4L'; // Replace with your Genius API token
+
+    // Function to get the year of the song using Genius API
+    async function getSongYearFromGenius(artist, trackName) {
+        const searchUrl = `https://api.genius.com/search?q=${encodeURIComponent(artist + " " + trackName)}`;
+        
+        try {
+            // Fetch the search results from Genius
+            const response = await fetch(searchUrl, {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${geniusToken}`,
+                },
+            });
+            
+            const data = await response.json();
+            
+            if (data.response.hits.length === 0) {
+                console.log("No song found for the provided artist and track name.");
+                return null;
+            }
+            
+            // Extract the song path (from the search results)
+            const songPath = data.response.hits[0].result.path;
+
+            // Now fetch the song's detailed information (including the release date)
+            const songUrl = `https://api.genius.com${songPath}`;
+            const songResponse = await fetch(songUrl, {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${geniusToken}`,
+                },
+            });
+            
+            const songData = await songResponse.json();
+
+            // Extract the release date and return the year
+            const releaseDate = songData.response.song.release_date;
+            const releaseYear = new Date(releaseDate).getFullYear();
+            console.log("Artist: " + artist + "  Song: " + trackName + " Year: " + releaseYear);
+            return releaseYear;
+        } catch (error) {
+            console.error("Error fetching data from Genius API:", error);
+            return null;
+        }
+    }
+
+    async function fetchPlaylistTracks(playlistId, onlySpotify, noSpotify) {
         const accessToken = await getAccessToken();
         if (!accessToken) {
             alert('Access token is missing.');
@@ -336,6 +555,39 @@
         }
 
         const apiUrl = `https://api.spotify.com/v1/playlists/${playlistId}/tracks`;
+        const limit = 100; // Maximum number of items per request
+        let offset = 0;    // Start from the first item
+        let allTracks = []; // To hold all tracks
+
+        // Fetch tracks in batches
+        while (true) {
+            const response = await fetch(`${apiUrl}?limit=${limit}&offset=${offset}`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${accessToken}`
+                }
+            });
+
+            const data = await response.json();
+
+            if (data.error) {
+                alert('Error fetching playlist tracks.');
+                return;
+            }
+
+            // Add the fetched tracks to the allTracks array
+            allTracks = allTracks.concat(data.items);
+
+            // If the number of tracks fetched is less than the limit, break the loop
+            if (data.items.length < limit) {
+                break;
+            }
+
+            // Increment the offset for the next batch of tracks
+            offset += limit;
+        }
+
+        /*const apiUrl = `https://api.spotify.com/v1/playlists/${playlistId}/tracks`;
         const response = await fetch(apiUrl, {
             method: 'GET',
             headers: {
@@ -348,15 +600,18 @@
         if (data.error) {
             alert('Error fetching playlist tracks.');
             return;
-        }
+        }*/
 
         // Function to generate the Spotify Code URL
         function generateSpotifyCodeUrl(trackId) {
             return `https://scannables.scdn.co/uri/plain/png/000000/white/640/spotify:track:${trackId}`;
         }
 
+        progressCounter = 0;
+        progressTotal = allTracks.length;
+
         // Process the tracks and return the desired details
-        const trackDetails = await Promise.all(data.items.map(async (item) => {
+        const trackDetails = await Promise.all(allTracks.map(async (item, index) => {
             const track = item.track; // Get the track from each playlist item
 
             // Extracting the relevant information
@@ -365,7 +620,50 @@
             const releaseYear = new Date(track.album.release_date).getFullYear(); // Extract the year from release date
             const spotifyCode = generateSpotifyCodeUrl(track.id);
 
-            const correctYear = await fetchYearFromMusicBrainz(artistName, songName);
+            // Calculate the incremental delay (e.g., 1000ms per item)
+            //const incrementalDelay = 10 * index + 3000 * (Math.floor(index / 8)); //2000 * Math.floor(index / 4); // Increase by 1000ms for each subsequent track
+            //const incrementalDelay = 70 * 1000 * Math.floor(index / 29);
+            //await delay(incrementalDelay);  // Incremental delay between requests
+ 
+            correctYear = releaseYear;
+            if (!onlySpotify) {
+                const incrementalDelay = 1005 * index;
+                await delay(incrementalDelay);
+                correctYear = await fetchYearFromMusicBrainz(artistName, songName);
+                    if (correctYear == " ") {
+                    correctYear = await fetchTrackReleaseYear(artistName, songName);
+                }
+
+                if (correctYear != " " && correctYear <= releaseYear) {
+                    console.log("Match");
+                } else {
+                    console.log("Failed for: " + artistName + " song: " + songName + " potential spotify year " + releaseYear);
+                    if (!noSpotify) {
+                        correctYear = releaseYear;
+                    }
+
+                    if (!noSpotify) {
+                        const cardContainer = document.getElementById("card-container");
+
+                        // Create a new div element
+                        const newDiv = document.createElement("div");
+
+                        // Add text to the new div
+                        newDiv.textContent = "Used spotify year: " + releaseYear + " Artist: " + artistName + " Song: " + songName;
+
+                        // Optionally, you can add a class or other attributes to the new div
+                        newDiv.classList.add("new-card");
+
+                        // Append the new div to the card container
+                        cardContainer.appendChild(newDiv);
+                    }
+                }
+            }
+
+
+            const progressContainer = document.getElementById("progress-container");
+            progressCounter = progressCounter + 1;
+            progressContainer.textContent = "Progress: " + progressCounter + " out of " + progressTotal + " songs";
 
             // Return the processed details in an object
             return {
@@ -605,7 +903,7 @@
     }
 
     // Function to generate cards for each track
-    async function generateCards() {
+    async function generateCards(onlySpotify, noSpotify) {
         const playlistId = document.getElementById("playlistId").value;
         if (!playlistId) {
             alert("Please enter a valid playlist ID.");
@@ -613,7 +911,14 @@
         }
         getAccessToken(); // Get access token from URL
 
-        const tracks = await fetchPlaylistTracks(parseSpotifyPlaylistId(playlistId));
+        const cardContainer = document.getElementById("card-container");
+        // Clear all child elements
+        cardContainer.innerHTML = "";
+
+        //getUserCollection();
+        //return;
+
+        const tracks = await fetchPlaylistTracks(parseSpotifyPlaylistId(playlistId), onlySpotify, noSpotify);
         const trackCount = tracks.length;
         const colorAssignments = balanceColors(trackCount, getColors());
         
