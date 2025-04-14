@@ -169,6 +169,10 @@
         <button id="generate-cards-button" onclick="generateCards(false, false)">Generate Cards: All</button>
     </div>
 
+    <div class="generateCard" style="padding: 20px;">
+        <button id="generate-cards-button" onclick="goToTool()">Arrange Cards from PDF</button>
+    </div>
+
     <div class="progress-container" style="padding: 20px;" id="progress-container"></div>
     <div class="card-container" style="padding: 20px;" id="card-container"></div>
 </div>
@@ -773,7 +777,7 @@ async function fetchTrackReleaseId(artistName, trackName) {
             pdf.addPage();
 
             // Create the back card (QR code for Spotify)
-            pdf.setFillColor('#FFFFFF'); // White background
+            pdf.setFillColor(backgroundColor); // White background
             pdf.rect(0, 0, width, height, 'F');
 
             const qrImage = track.spotifyCode;
@@ -927,6 +931,10 @@ async function fetchTrackReleaseId(artistName, trackName) {
 
         //generateCardsBuild(tracks, colorAssignments);
         generatePDF(tracks, colorAssignments, width, height);
+    }
+
+    function goToTool() {
+      window.location.href = "cards.html";
     }
 </script>
 

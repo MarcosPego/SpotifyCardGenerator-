@@ -1,0 +1,116 @@
+<head>
+  <meta charset="UTF-8">
+  <title>Arrange Cards</title>
+
+  <!-- PDF.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
+  <script>
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
+  </script>
+
+  <!-- pdf-lib -->
+  <script src="https://unpkg.com/pdf-lib/dist/pdf-lib.min.js"></script>
+</head>
+<body>
+  <h2>Upload your PDF:</h2>
+  <input type="file" id="pdfInput" />
+  <button onclick="processPDF()">Generate Output PDF</button>
+  <p id="status"></p>
+
+  <button onclick="window.location.href='index.html'">← Back to Home</button>
+
+  <canvas id="renderCanvas" style="display:none;"></canvas>
+
+  <script>
+    const cardWidthMM = 70;
+    const cardHeightMM = 70;
+    const dpi = 300;
+    const mmToIn = mm => mm / 25.4;
+    const ptPerInch = 72;
+
+    const cardWidthPx = mmToIn(cardWidthMM) * dpi;
+    const cardHeightPx = mmToIn(cardHeightMM) * dpi;
+    const cardWidthPt = mmToIn(cardWidthMM) * ptPerInch;
+    const cardHeightPt = mmToIn(cardHeightMM) * ptPerInch;
+
+    const A4_WIDTH_PT = 595.28;
+    const A4_HEIGHT_PT = 841.89;
+    const cardsPerRow = Math.floor(A4_WIDTH_PT / cardWidthPt);
+    const cardsPerCol = Math.floor(A4_HEIGHT_PT / cardHeightPt);
+
+    async function processPDF() {
+      const input = document.getElementById('pdfInput');
+      if (!input.files.length) return;
+
+      document.getElementById('status').innerText = 'Loading...';
+
+      const file = input.files[0];
+      const arrayBuffer = await file.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+      const totalPages = pdf.numPages;
+
+      if (totalPages % 2 !== 0) {
+        alert("PDF must have even number of pages (front/back for each card)");
+        return;
+      }
+
+      const { PDFDocument } = PDFLib;
+      const outDoc = await PDFDocument.create();
+      const canvas = document.getElementById('renderCanvas');
+      const ctx = canvas.getContext('2d');
+      canvas.width = cardWidthPx;
+      canvas.height = cardHeightPx;
+
+      let drawPages = async (startIdx, reverse = false) => {
+        let page = outDoc.addPage([A4_WIDTH_PT, A4_HEIGHT_PT]);
+        let cardIndex = 0;
+
+        for (let row = 0; row < cardsPerCol; row++) {
+          for (let col = 0; col < cardsPerRow; col++) {
+            let actualCol = reverse ? cardsPerRow - 1 - col : col;
+            let pdfPageIndex = startIdx + cardIndex * 2 + (reverse ? 1 : 0);
+            if (pdfPageIndex >= totalPages) continue;
+
+            const srcPage = await pdf.getPage(pdfPageIndex + 1);
+            const viewport = srcPage.getViewport({ scale: cardWidthPx / srcPage.getViewport({ scale: 1 }).width });
+
+            await srcPage.render({
+              canvasContext: ctx,
+              viewport
+            }).promise;
+
+            // Convert canvas to PNG blob
+            const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+            const imageBytes = await blob.arrayBuffer();
+            const image = await outDoc.embedPng(imageBytes);
+
+            const x = actualCol * cardWidthPt;
+            const y = A4_HEIGHT_PT - (row + 1) * cardHeightPt;
+
+            page.drawImage(image, {
+              x, y, width: cardWidthPt, height: cardHeightPt
+            });
+
+            cardIndex++;
+          }
+        }
+      };
+
+      for (let i = 0; i < totalPages / 2; i += cardsPerRow * cardsPerCol) {
+        await drawPages(i * 2, false); // fronts
+        await drawPages(i * 2, true);  // backs (mirrored)
+      }
+
+      const pdfBytes = await outDoc.save();
+      const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = "cards-arranged.pdf";
+      a.click();
+
+      document.getElementById('status').innerText = "Done!";
+    }
+  </script>
+</body>
+</html>
