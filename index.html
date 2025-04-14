@@ -95,6 +95,15 @@
             transition: background-color 0.3s;
         }
 
+        .toggle-on {
+            background-color: #4CAF50;
+            color: white;
+            }
+        .toggle-off {
+        background-color: #9E9E9E;
+        color: white;
+        }
+
         #generate-cards-button:hover {
             background-color: #45a049;
         }
@@ -151,6 +160,10 @@
     <button type="button" onclick="addColor()">Add Color</button>
 
     <div class="card-size-container">
+        <button id="toggleButton" class="toggle-off" onclick=toggleDashRemove()>Turn On "Remove ' - ' Part"</button>
+    </div>
+
+    <div class="card-size-container">
         <label for="cardWidth">Card Size:</label>
         <input type="number" id="cardWidth" name="cardWidth" value="512" min="1" required>
         x
@@ -180,6 +193,7 @@
 <script>
     const { jsPDF } = window.jspdf;
 
+    let removeDashFlag = false;
     let colorCount = 5;
 
     function openColorPicker(colorInputId) {
@@ -208,6 +222,20 @@
     function removeColor(index) {
         const colorGroup = document.getElementById(`color-group-${index}`);
         colorGroup.remove();
+    }
+
+    function toggleDashRemove() {
+        const toggleButton = document.getElementById("toggleButton");
+        removeDashFlag = !removeDashFlag;
+        if (removeDashFlag) {
+            toggleButton.innerText = 'Turn Off "Remove \' - \' Part"';
+            toggleButton.classList.remove("toggle-off");
+            toggleButton.classList.add("toggle-on");
+        } else {
+            toggleButton.innerText = 'Turn On "Remove \' - \' Part"';
+            toggleButton.classList.remove("toggle-on");
+            toggleButton.classList.add("toggle-off");
+        }
     }
 
     // Spotify API Credentials and Redirect URI
@@ -620,7 +648,10 @@ async function fetchTrackReleaseId(artistName, trackName) {
 
             // Extracting the relevant information
             const artistName = track.artists[0].name; // Assuming there is at least one artist
-            const songName = track.name;
+            songName = track.name;
+            if (removeDashFlag) {
+                songName = songName.split(" - ")[0];
+            }
             const releaseYear = new Date(track.album.release_date).getFullYear(); // Extract the year from release date
             const spotifyCode = generateSpotifyCodeUrl(track.id);
 
