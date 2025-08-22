@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Dropbox Video Player</title>
+  <style>
+    body {
+      margin: 0;
+      display: grid;
+      place-items: center;
+      height: 100vh;
+      background: #111;
+      color: #eee;
+      font-family: sans-serif;
+    }
+    video {
+      max-width: 100%;
+      max-height: 90vh;
+      background: black;
+    }
+    footer {
+      font-size: 12px;
+      margin-top: 8px;
+      color: #aaa;
+    }
+  </style>
+</head>
+<body>
+  <div>
+    <video id="player" controls playsinline></video>
+    <footer>Paste a Dropbox share link like <code>?v=YOUR_DROPBOX_LINK</code></footer>
+  </div>
+  <script>
+    const params = new URLSearchParams(location.search);
+    const link = params.get("v");
+    if (link) {
+      // Convert Dropbox link to direct link
+      let src = link;
+      src = src.replace("www.dropbox.com", "dl.dropboxusercontent.com");
+      src = src.replace("?dl=0", "?raw=1");
+      const player = document.getElementById("player");
+      player.src = src;
+      player.play();
+    }
+  </script>
+</body>
+</html>
